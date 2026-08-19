@@ -1,0 +1,414 @@
+{
+  "name": "HITL AI Content Engine - Loop Upgrade",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Start Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 300],
+      "webhookId": "trigger-workflow"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=🚀 Task Received! Generating concepts for: {{ $json.body.brief }}",
+        "additionalFields": {}
+      },
+      "id": "2",
+      "name": "Telegram: Task Received",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "your-telegram-credentials",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $('Start Webhook').item.json.body.brief }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an expert social media manager. Based on the user's brief, create an engaging social media caption and a highly detailed image generation prompt for Stable Diffusion/Flux. The prompt must be vivid, descriptive, and optimized for image generators."
+        }
+      },
+      "id": "3",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "id": "4",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [400, 500],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "your-gemini-credentials",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"caption\": { \"type\": \"string\" },\n    \"image_prompt\": { \"type\": \"string\" }\n  },\n  \"required\": [\"caption\", \"image_prompt\"]\n}"
+      },
+      "id": "5",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [550, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "inputs",
+              "value": "={{ $json.image_prompt }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "image"
+            }
+          }
+        }
+      },
+      "id": "6",
+      "name": "Hugging Face Image Gen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [600, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "your-hf-credentials",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FRONTEND_URL }}/api/catch-draft",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "caption",
+              "value": "={{ $('AI Agent').item.json.caption }}"
+            },
+            {
+              "name": "image_prompt",
+              "value": "={{ $('AI Agent').item.json.image_prompt }}"
+            },
+            {
+              "name": "resumeUrl",
+              "value": "={{ $execution.resumeUrl }}"
+            },
+            {
+              "name": "brief",
+              "value": "={{ $('Start Webhook').item.json.body.brief }}"
+            },
+            {
+              "name": "image_data",
+              "value": "=data:image/jpeg;base64,{{ $binary.image.data }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7",
+      "name": "Send Draft to Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "8",
+      "name": "Wait for Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1000, 300],
+      "webhookId": "wait-for-approval"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.action }}",
+              "operation": "equal",
+              "value2": "regenerate"
+            }
+          ]
+        }
+      },
+      "id": "9",
+      "name": "Check Action",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=✅ Concept Approved! Publishing to GitHub and delivering final assets...",
+        "additionalFields": {}
+      },
+      "id": "10",
+      "name": "Telegram: Concept Approved",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [1400, 450],
+      "credentials": {
+        "telegramApi": {
+          "id": "your-telegram-credentials",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "create",
+        "owner": "SameerKr-26",
+        "repository": "Content-Generation",
+        "filePath": "=images/img_{{ $now.toFormat('yyyyMMddHHmmss') }}.png",
+        "fileContent": "={{ $('Hugging Face Image Gen').item.binary.image }}",
+        "commitMessage": "Add generated image"
+      },
+      "id": "11",
+      "name": "GitHub: Push Image",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1600, 350],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "your-github-credentials",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "create",
+        "owner": "SameerKr-26",
+        "repository": "Content-Generation",
+        "filePath": "=captions/cap_{{ $now.toFormat('yyyyMMddHHmmss') }}.txt",
+        "fileContent": "={{ $('Wait for Approval').item.json.body.approved_caption }}",
+        "commitMessage": "Add generated caption text"
+      },
+      "id": "12",
+      "name": "GitHub: Push Caption",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1600, 550],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "your-github-credentials",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=🎉 Content finalized and pushed to GitHub!\n\nCaption:\n{{ $('Wait for Approval').item.json.body.approved_caption }}",
+        "additionalFields": {
+          "file": "={{ $('Hugging Face Image Gen').item.binary.image }}"
+        }
+      },
+      "id": "13",
+      "name": "Telegram: Final Delivery",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [1800, 450],
+      "credentials": {
+        "telegramApi": {
+          "id": "your-telegram-credentials",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Webhook": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Task Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Task Received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Hugging Face Image Gen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hugging Face Image Gen": {
+      "main": [
+        [
+          {
+            "node": "Send Draft to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Draft to Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Wait for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Approval": {
+      "main": [
+        [
+          {
+            "node": "Check Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Action": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Concept Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Concept Approved": {
+      "main": [
+        [
+          {
+            "node": "GitHub: Push Image",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GitHub: Push Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub: Push Image": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Final Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub: Push Caption": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Final Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
