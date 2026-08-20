@@ -13,8 +13,6 @@ interface Draft {
   image_data?: string;
   n8n_resume_url: string;
   status: string;
-  image_status: string;
-  text_status: string;
 }
 
 export default function ApprovalBoard() {
@@ -77,19 +75,11 @@ export default function ApprovalBoard() {
       });
 
       if (response.ok) {
-        if (action === 'approve_all' || action === 'reject') {
+        if (action === 'approve' || action === 'reject') {
           setDrafts(prev => prev.filter(d => d.id !== draft.id));
         } else {
           // Optimistically update statuses
-          setDrafts(prev => prev.map(d => {
-            if (d.id === draft.id) {
-              if (action === 'regenerate_image') return { ...d, image_status: 'generating' };
-              if (action === 'regenerate_text') return { ...d, text_status: 'generating' };
-              if (action === 'approve_image') return { ...d, image_status: 'approved' };
-              if (action === 'approve_text') return { ...d, text_status: 'approved' };
-            }
-            return d;
-          }));
+          setDrafts(prev => prev.map(d => d.id === draft.id ? { ...d, status: 'generating' } : d));
         }
       } else {
         alert(`Failed to execute ${action}`);
@@ -165,10 +155,7 @@ export default function ApprovalBoard() {
     <div className="space-y-8">
       <h2 className="text-2xl font-semibold text-white mb-4">Pending Approvals</h2>
       <div className="grid gap-8">
-        {drafts.map((draft) => {
-          const bothApproved = draft.image_status === 'approved' && draft.text_status === 'approved';
-          
-          return (
+        {drafts.map((draft) => (
           <div key={draft.id} className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 overflow-hidden shadow-lg transition-all hover:shadow-xl">
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
@@ -184,33 +171,10 @@ export default function ApprovalBoard() {
               {/* IMAGE SECTION */}
               <div className="p-6 space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-white flex items-center">
-                    Visuals
-                    {draft.image_status === 'approved' && <Check className="w-4 h-4 text-green-400 ml-2" />}
-                  </h3>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => handleAction(draft, 'regenerate_image')}
-                      disabled={draft.image_status === 'generating'}
-                      className="p-1.5 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded text-xs transition-colors"
-                      title="Regenerate Image"
-                    >
-                      {draft.image_status === 'generating' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
-                    </button>
-                    {draft.image_status !== 'approved' && (
-                      <button 
-                        onClick={() => handleAction(draft, 'approve_image')}
-                        disabled={draft.image_status === 'generating'}
-                        className="p-1.5 bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded text-xs transition-colors"
-                        title="Approve Image"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+                  <h3 className="text-lg font-medium text-white flex items-center">Visuals</h3>
                 </div>
 
-                {draft.image_status === 'generating' ? (
+                {draft.status === 'generating' ? (
                   <div className="w-full h-48 bg-black/30 rounded flex items-center justify-center">
                     <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
                   </div>
@@ -239,33 +203,10 @@ export default function ApprovalBoard() {
               {/* TEXT SECTION */}
               <div className="p-6 space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-white flex items-center">
-                    Copywriting
-                    {draft.text_status === 'approved' && <Check className="w-4 h-4 text-green-400 ml-2" />}
-                  </h3>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => handleAction(draft, 'regenerate_text')}
-                      disabled={draft.text_status === 'generating'}
-                      className="p-1.5 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded text-xs transition-colors"
-                      title="Regenerate Copy"
-                    >
-                      {draft.text_status === 'generating' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
-                    </button>
-                    {draft.text_status !== 'approved' && (
-                      <button 
-                        onClick={() => handleAction(draft, 'approve_text')}
-                        disabled={draft.text_status === 'generating'}
-                        className="p-1.5 bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded text-xs transition-colors"
-                        title="Approve Copy"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+                  <h3 className="text-lg font-medium text-white flex items-center">Copywriting</h3>
                 </div>
 
-                {draft.text_status === 'generating' ? (
+                {draft.status === 'generating' ? (
                   <div className="w-full h-48 bg-black/30 rounded flex items-center justify-center">
                     <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
                   </div>
@@ -322,23 +263,30 @@ export default function ApprovalBoard() {
                   onClick={() => handleReject(draft.id)}
                   className="flex items-center px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors"
                 >
-                  <X className="w-4 h-4 mr-1" /> Delete Entire Draft
+                  <X className="w-4 h-4 mr-1" /> Reject
                 </button>
                 
-                {bothApproved && (
-                  <button 
-                    onClick={() => handleAction(draft, 'approve_all')}
-                    disabled={actionLoading !== null}
-                    className="flex items-center px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)] rounded-lg text-sm font-medium transition-all"
-                  >
-                    {actionLoading === `${draft.id}-approve_all` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                    Publish Concept
-                  </button>
-                )}
+                <button 
+                  onClick={() => handleAction(draft, 'regenerate')}
+                  disabled={draft.status === 'generating'}
+                  className="flex items-center px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-all"
+                >
+                  {actionLoading === `${draft.id}-regenerate` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCcw className="w-4 h-4 mr-2" />}
+                  Regenerate All
+                </button>
+
+                <button 
+                  onClick={() => handleAction(draft, 'approve')}
+                  disabled={draft.status === 'generating' || actionLoading !== null}
+                  className="flex items-center px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)] rounded-lg text-sm font-medium transition-all"
+                >
+                  {actionLoading === `${draft.id}-approve` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                  Approve & Publish
+                </button>
               </div>
             </div>
           </div>
-        )})}
+        ))}
       </div>
     </div>
   );

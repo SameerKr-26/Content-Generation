@@ -33,18 +33,10 @@ export async function POST(req: Request) {
     let dbError = null;
     let updates: any = {};
 
-    if (action === 'regenerate_image') {
-      updates.image_status = 'generating';
-    } else if (action === 'regenerate_text') {
-      updates.text_status = 'generating';
-    } else if (action === 'approve_image') {
-      updates.image_status = 'approved';
-    } else if (action === 'approve_text') {
-      updates.text_status = 'approved';
-    } else if (action === 'approve_all') {
-      updates.image_status = 'approved';
-      updates.text_status = 'approved';
-      updates.status = 'approved'; // overall status
+    if (action === 'regenerate') {
+      updates.status = 'generating';
+    } else if (action === 'approve') {
+      updates.status = 'approved';
     }
 
     if (Object.keys(updates).length > 0) {

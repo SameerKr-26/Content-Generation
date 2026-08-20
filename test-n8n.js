@@ -1,67 +1,53 @@
 const fs = require('fs');
 
 const workflow = {
-  name: "HITL AI Content Engine - Parallel Approvals",
+  name: "HITL AI Content Engine - Unified Simple Loop",
   nodes: [
     {
       parameters: { httpMethod: "POST", path: "trigger", options: {} },
-      id: "1", name: "Start Webhook", type: "n8n-nodes-base.webhook", typeVersion: 1.1, position: [0, 300], webhookId: "trigger-workflow"
+      id: "webhook_start", name: "Start Webhook", type: "n8n-nodes-base.webhook", typeVersion: 1.1, position: [0, 300], webhookId: "trigger-workflow"
     },
     {
       parameters: { resume: "webhook", options: {} },
-      id: "2", name: "Wait for Approval", type: "n8n-nodes-base.wait", typeVersion: 1.1, position: [0, 500], webhookId: "wait-for-approval"
+      id: "wait", name: "Wait for Approval", type: "n8n-nodes-base.wait", typeVersion: 1.1, position: [1400, 300], webhookId: "wait-for-approval"
     },
     {
       parameters: { chatId: "={{ $env.TELEGRAM_CHAT_ID }}", text: "=🚀 Task Received! Generating concepts for: {{ $json.body.brief }}", additionalFields: {} },
-      id: "tel_start", name: "Telegram: Start", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [200, 300],
-      credentials: { telegramApi: { id: "your-telegram-credentials", name: "Telegram account" } }
-    },
-    {
-      parameters: { chatId: "={{ $env.TELEGRAM_CHAT_ID }}", text: "=🔄 Regenerating Image...", additionalFields: {} },
-      id: "tel_regen_img", name: "Telegram: Regen Image", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [500, 200],
-      credentials: { telegramApi: { id: "your-telegram-credentials", name: "Telegram account" } }
-    },
-    {
-      parameters: { chatId: "={{ $env.TELEGRAM_CHAT_ID }}", text: "=🔄 Regenerating Text...", additionalFields: {} },
-      id: "tel_regen_txt", name: "Telegram: Regen Text", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [500, 400],
+      id: "tel_start", name: "Telegram: Task Received", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [200, 300],
       credentials: { telegramApi: { id: "your-telegram-credentials", name: "Telegram account" } }
     },
     {
       parameters: {
-        dataType: "string",
-        value1: "={{ $json.body.action || 'first_run' }}",
-        rules: {
-          rules: [
-            { operation: "equal", value2: "first_run" },
-            { operation: "equal", value2: "regenerate_image" },
-            { operation: "equal", value2: "regenerate_text" },
-            { operation: "equal", value2: "approve_all" }
+        conditions: {
+          string: [
+            { value1: "={{ $json.body.action }}", operation: "equal", value2: "regenerate" }
           ]
         }
       },
-      id: "3", name: "Switch Action", type: "n8n-nodes-base.switch", typeVersion: 1.1, position: [400, 300]
+      id: "if_action", name: "Check Action", type: "n8n-nodes-base.if", typeVersion: 1, position: [1600, 300]
+    },
+    {
+      parameters: { chatId: "={{ $env.TELEGRAM_CHAT_ID }}", text: "=🔄 Regenerating ALL concepts based on brief...", additionalFields: {} },
+      id: "tel_regen", name: "Telegram: Regenerating", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [400, 500],
+      credentials: { telegramApi: { id: "your-telegram-credentials", name: "Telegram account" } }
     },
     
-    // Langchain Models and Parsers
+    // AI Generation block
+    {
+      parameters: { text: "={{ $('Start Webhook').item ? $('Start Webhook').item.json.body.brief : $('Wait for Approval').item.json.body.brief }}", hasOutputParser: true, options: { systemMessage: "You are an expert social media manager and prompt engineer. Create a highly detailed image generation prompt, an engaging caption, and a list of relevant hashtags based on the user's brief." } },
+      id: "ai_agent", name: "AI Agent (Unified)", type: "@n8n/n8n-nodes-langchain.agent", typeVersion: 3.1, position: [600, 300]
+    },
     {
       parameters: { modelName: "models/gemini-3.1-flash-lite", options: {} },
-      id: "5", name: "Google Gemini", type: "@n8n/n8n-nodes-langchain.lmChatGoogleGemini", typeVersion: 1.1, position: [700, -200],
+      id: "gemini", name: "Google Gemini", type: "@n8n/n8n-nodes-langchain.lmChatGoogleGemini", typeVersion: 1.1, position: [600, 100],
       credentials: { googlePalmApi: { id: "your-gemini-credentials", name: "Google Gemini(PaLM) Api account" } }
     },
     {
-      parameters: { jsonSchema: "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"image_prompt\": { \"type\": \"string\" }\n  },\n  \"required\": [\"image_prompt\"]\n}" },
-      id: "6", name: "Image Parser", type: "@n8n/n8n-nodes-langchain.outputParserStructured", typeVersion: 1.3, position: [750, -50]
-    },
-    {
-      parameters: { jsonSchema: "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"caption\": { \"type\": \"string\" },\n    \"hashtags\": { \"type\": \"string\" }\n  },\n  \"required\": [\"caption\", \"hashtags\"]\n}" },
-      id: "9", name: "Text Parser", type: "@n8n/n8n-nodes-langchain.outputParserStructured", typeVersion: 1.3, position: [1050, -50]
+      parameters: { jsonSchema: "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"caption\": { \"type\": \"string\" },\n    \"hashtags\": { \"type\": \"string\" },\n    \"image_prompt\": { \"type\": \"string\" }\n  },\n  \"required\": [\"caption\", \"hashtags\", \"image_prompt\"]\n}" },
+      id: "parser", name: "Output Parser", type: "@n8n/n8n-nodes-langchain.outputParserStructured", typeVersion: 1.3, position: [750, 100]
     },
 
-    // First Run Path
-    {
-      parameters: { text: "={{ $('Start Webhook').item.json.body.brief }}", hasOutputParser: true, options: { systemMessage: "Create a highly detailed image generation prompt for Stable Diffusion/Flux based on the user's brief. The prompt must be vivid and descriptive." } },
-      id: "4", name: "First Run - Image Prompt", type: "@n8n/n8n-nodes-langchain.agent", typeVersion: 3.1, position: [700, 0]
-    },
+    // Image Gen & API
     {
       parameters: {
         method: "POST", url: "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
@@ -69,156 +55,79 @@ const workflow = {
         bodyParameters: { parameters: [ { name: "inputs", value: "={{ $json.image_prompt }}" } ] },
         options: { response: { response: { responseFormat: "file", outputPropertyName: "image" } } }
       },
-      id: "7", name: "First Run - HF Gen", type: "n8n-nodes-base.httpRequest", typeVersion: 4.1, position: [900, 0],
-      credentials: { httpHeaderAuth: { id: "your-hf-credentials", name: "Header Auth account" } }
-    },
-    {
-      parameters: { text: "={{ $('Start Webhook').item.json.body.brief }}", hasOutputParser: true, options: { systemMessage: "You are an expert social media manager. Based on the brief, create an engaging caption and a list of hashtags." } },
-      id: "8", name: "First Run - Text", type: "@n8n/n8n-nodes-langchain.agent", typeVersion: 3.1, position: [1100, 0]
-    },
-    {
-      parameters: {
-        method: "POST", url: "={{ $env.FRONTEND_URL }}/api/catch-draft", sendBody: true,
-        bodyParameters: { parameters: [
-          { name: "brief", value: "={{ $('Start Webhook').item.json.body.brief }}" },
-          { name: "caption", value: "={{ $json.caption }}" },
-          { name: "hashtags", value: "={{ $json.hashtags }}" },
-          { name: "image_prompt", value: "={{ $('First Run - Image Prompt').item.json.image_prompt }}" },
-          { name: "image_data", value: "=data:image/jpeg;base64,{{ $('First Run - HF Gen').item.binary.image.data }}" },
-          { name: "resumeUrl", value: "={{ $execution.resumeUrl }}" }
-        ] },
-        options: {}
-      },
-      id: "10", name: "Send Draft (First Run)", type: "n8n-nodes-base.httpRequest", typeVersion: 4.1, position: [1300, 0]
-    },
-
-    // Regen Image Path
-    {
-      parameters: { text: "={{ $('Wait for Approval').item.json.body.brief }}", hasOutputParser: true, options: { systemMessage: "Create a highly detailed image generation prompt for Stable Diffusion/Flux based on the user's brief. Make it different from before to explore new concepts." } },
-      id: "20", name: "Regen Image - Prompt", type: "@n8n/n8n-nodes-langchain.agent", typeVersion: 3.1, position: [700, 200]
-    },
-    {
-      parameters: {
-        method: "POST", url: "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
-        authentication: "genericCredentialType", genericAuthType: "httpHeaderAuth", sendBody: true,
-        bodyParameters: { parameters: [ { name: "inputs", value: "={{ $json.image_prompt }}" } ] },
-        options: { response: { response: { responseFormat: "file", outputPropertyName: "image" } } }
-      },
-      id: "21", name: "Regen Image - HF", type: "n8n-nodes-base.httpRequest", typeVersion: 4.1, position: [900, 200],
+      id: "hf", name: "Hugging Face Image Gen", type: "n8n-nodes-base.httpRequest", typeVersion: 4.1, position: [900, 300],
       credentials: { httpHeaderAuth: { id: "your-hf-credentials", name: "Header Auth account" } }
     },
     {
       parameters: {
         method: "POST", url: "={{ $env.FRONTEND_URL }}/api/catch-draft", sendBody: true,
         bodyParameters: { parameters: [
-          { name: "id", value: "={{ $('Wait for Approval').item.json.body.id }}" },
-          { name: "image_prompt", value: "={{ $('Regen Image - Prompt').item.json.image_prompt }}" },
+          { name: "id", value: "={{ $('Wait for Approval').item ? $('Wait for Approval').item.json.body.id : '' }}" },
+          { name: "brief", value: "={{ $('Start Webhook').item ? $('Start Webhook').item.json.body.brief : $('Wait for Approval').item.json.body.brief }}" },
+          { name: "caption", value: "={{ $('AI Agent (Unified)').item.json.caption }}" },
+          { name: "hashtags", value: "={{ $('AI Agent (Unified)').item.json.hashtags }}" },
+          { name: "image_prompt", value: "={{ $('AI Agent (Unified)').item.json.image_prompt }}" },
           { name: "image_data", value: "=data:image/jpeg;base64,{{ $binary.image.data }}" },
           { name: "resumeUrl", value: "={{ $execution.resumeUrl }}" }
         ] },
         options: {}
       },
-      id: "11", name: "Send Draft (Regen Image)", type: "n8n-nodes-base.httpRequest", typeVersion: 4.1, position: [1100, 200]
+      id: "send_draft", name: "Send Draft to Dashboard", type: "n8n-nodes-base.httpRequest", typeVersion: 4.1, position: [1150, 300]
     },
 
-    // Regen Text Path
+    // Approval Flow (IF False)
     {
-      parameters: { text: "={{ $('Wait for Approval').item.json.body.brief }}", hasOutputParser: true, options: { systemMessage: "You are an expert social media manager. Based on the brief, create an engaging caption and a list of hashtags. Write it differently this time." } },
-      id: "30", name: "Regen Text - AI", type: "@n8n/n8n-nodes-langchain.agent", typeVersion: 3.1, position: [700, 400]
-    },
-    {
-      parameters: {
-        method: "POST", url: "={{ $env.FRONTEND_URL }}/api/catch-draft", sendBody: true,
-        bodyParameters: { parameters: [
-          { name: "id", value: "={{ $('Wait for Approval').item.json.body.id }}" },
-          { name: "caption", value: "={{ $json.caption }}" },
-          { name: "hashtags", value: "={{ $json.hashtags }}" },
-          { name: "resumeUrl", value: "={{ $execution.resumeUrl }}" }
-        ] },
-        options: {}
-      },
-      id: "12", name: "Send Draft (Regen Text)", type: "n8n-nodes-base.httpRequest", typeVersion: 4.1, position: [1100, 400]
-    },
-
-    // Approval Path
-    {
-      parameters: { chatId: "={{ $env.TELEGRAM_CHAT_ID }}", text: "=✅ All Concepts Approved! Publishing to GitHub...", additionalFields: {} },
-      id: "13", name: "Telegram: Approved", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [700, 600],
+      parameters: { chatId: "={{ $env.TELEGRAM_CHAT_ID }}", text: "=✅ Concept Approved! Publishing to GitHub...", additionalFields: {} },
+      id: "tel_appr", name: "Telegram: Approved", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [1800, 400],
       credentials: { telegramApi: { id: "your-telegram-credentials", name: "Telegram account" } }
     },
     {
       parameters: { authentication: "oAuth2", resource: "file", operation: "create", owner: "SameerKr-26", repository: "Content-Generation", filePath: "=images/img_{{ $now.toFormat('yyyyMMddHHmmss') }}.png", fileContent: "={{ $('Wait for Approval').item.json.body.image_data.split(',')[1] }}", commitMessage: "Add generated image" },
-      id: "gh_img", name: "GitHub: Push Image", type: "n8n-nodes-base.github", typeVersion: 1, position: [900, 500],
+      id: "gh_img", name: "GitHub: Push Image", type: "n8n-nodes-base.github", typeVersion: 1, position: [2000, 300],
       credentials: { githubOAuth2Api: { id: "your-github-credentials", name: "GitHub account" } }
     },
     {
       parameters: { authentication: "oAuth2", resource: "file", operation: "create", owner: "SameerKr-26", repository: "Content-Generation", filePath: "=captions/cap_{{ $now.toFormat('yyyyMMddHHmmss') }}.txt", fileContent: "={{ $('Wait for Approval').item.json.body.caption }}\n\n{{ $('Wait for Approval').item.json.body.hashtags }}", commitMessage: "Add generated caption text" },
-      id: "gh_txt", name: "GitHub: Push Caption", type: "n8n-nodes-base.github", typeVersion: 1, position: [900, 700],
+      id: "gh_txt", name: "GitHub: Push Caption", type: "n8n-nodes-base.github", typeVersion: 1, position: [2000, 500],
       credentials: { githubOAuth2Api: { id: "your-github-credentials", name: "GitHub account" } }
     },
     {
       parameters: { chatId: "={{ $env.TELEGRAM_CHAT_ID }}", text: "=🎉 Content finalized and pushed to GitHub!\n\nCaption:\n{{ $('Wait for Approval').item.json.body.caption }}", additionalFields: {} },
-      id: "14", name: "Telegram: Final Delivery", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [1100, 600],
+      id: "tel_final", name: "Telegram: Final Delivery", type: "n8n-nodes-base.telegram", typeVersion: 1.1, position: [2200, 400],
       credentials: { telegramApi: { id: "your-telegram-credentials", name: "Telegram account" } }
     }
   ],
   connections: {
-    "Start Webhook": { main: [ [ { node: "Telegram: Start", type: "main", index: 0 } ] ] },
-    "Telegram: Start": { main: [ [ { node: "Switch Action", type: "main", index: 0 } ] ] },
-    "Wait for Approval": { main: [ [ { node: "Switch Action", type: "main", index: 0 } ] ] },
+    "Start Webhook": { main: [ [ { node: "Telegram: Task Received", type: "main", index: 0 } ] ] },
+    "Telegram: Task Received": { main: [ [ { node: "AI Agent (Unified)", type: "main", index: 0 } ] ] },
     
-    "Switch Action": {
+    "AI Agent (Unified)": { main: [ [ { node: "Hugging Face Image Gen", type: "main", index: 0 } ] ] },
+    "Hugging Face Image Gen": { main: [ [ { node: "Send Draft to Dashboard", type: "main", index: 0 } ] ] },
+    "Send Draft to Dashboard": { main: [ [ { node: "Wait for Approval", type: "main", index: 0 } ] ] },
+    
+    "Wait for Approval": { main: [ [ { node: "Check Action", type: "main", index: 0 } ] ] },
+    
+    "Check Action": {
       main: [
-        [ { node: "First Run - Image Prompt", type: "main", index: 0 } ],
-        [ { node: "Telegram: Regen Image", type: "main", index: 0 } ],
-        [ { node: "Telegram: Regen Text", type: "main", index: 0 } ],
-        [ { node: "Telegram: Approved", type: "main", index: 0 } ]
+        [ { node: "Telegram: Regenerating", type: "main", index: 0 } ], // True path (Regenerate)
+        [ { node: "Telegram: Approved", type: "main", index: 0 } ]       // False path (Approve)
       ]
     },
-
-    "Telegram: Regen Image": { main: [ [ { node: "Regen Image - Prompt", type: "main", index: 0 } ] ] },
-    "Telegram: Regen Text": { main: [ [ { node: "Regen Text - AI", type: "main", index: 0 } ] ] },
-
-    "First Run - Image Prompt": { main: [ [ { node: "First Run - HF Gen", type: "main", index: 0 } ] ] },
-    "First Run - HF Gen": { main: [ [ { node: "First Run - Text", type: "main", index: 0 } ] ] },
-    "First Run - Text": { main: [ [ { node: "Send Draft (First Run)", type: "main", index: 0 } ] ] },
-    "Send Draft (First Run)": { main: [ [ { node: "Wait for Approval", type: "main", index: 0 } ] ] },
-
-    "Regen Image - Prompt": { main: [ [ { node: "Regen Image - HF", type: "main", index: 0 } ] ] },
-    "Regen Image - HF": { main: [ [ { node: "Send Draft (Regen Image)", type: "main", index: 0 } ] ] },
-    "Send Draft (Regen Image)": { main: [ [ { node: "Wait for Approval", type: "main", index: 0 } ] ] },
-
-    "Regen Text - AI": { main: [ [ { node: "Send Draft (Regen Text)", type: "main", index: 0 } ] ] },
-    "Send Draft (Regen Text)": { main: [ [ { node: "Wait for Approval", type: "main", index: 0 } ] ] },
-
+    
+    "Telegram: Regenerating": { main: [ [ { node: "AI Agent (Unified)", type: "main", index: 0 } ] ] },
+    
     "Telegram: Approved": { main: [ [ { node: "GitHub: Push Image", type: "main", index: 0 }, { node: "GitHub: Push Caption", type: "main", index: 0 } ] ] },
     "GitHub: Push Image": { main: [ [ { node: "Telegram: Final Delivery", type: "main", index: 0 } ] ] },
     "GitHub: Push Caption": { main: [ [ { node: "Telegram: Final Delivery", type: "main", index: 0 } ] ] },
 
     "Google Gemini": {
       ai_languageModel: [
-        [
-          { node: "First Run - Image Prompt", type: "ai_languageModel", index: 0 },
-          { node: "First Run - Text", type: "ai_languageModel", index: 0 },
-          { node: "Regen Image - Prompt", type: "ai_languageModel", index: 0 },
-          { node: "Regen Text - AI", type: "ai_languageModel", index: 0 }
-        ]
+        [ { node: "AI Agent (Unified)", type: "ai_languageModel", index: 0 } ]
       ]
     },
-    "Image Parser": {
+    "Output Parser": {
       ai_outputParser: [
-        [
-          { node: "First Run - Image Prompt", type: "ai_outputParser", index: 0 },
-          { node: "Regen Image - Prompt", type: "ai_outputParser", index: 0 }
-        ]
-      ]
-    },
-    "Text Parser": {
-      ai_outputParser: [
-        [
-          { node: "First Run - Text", type: "ai_outputParser", index: 0 },
-          { node: "Regen Text - AI", type: "ai_outputParser", index: 0 }
-        ]
+        [ { node: "AI Agent (Unified)", type: "ai_outputParser", index: 0 } ]
       ]
     }
   },
