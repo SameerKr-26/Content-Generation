@@ -2,22 +2,98 @@
   "name": "HITL AI Content Engine - Parallel Approvals",
   "nodes": [
     {
-      "parameters": { "httpMethod": "POST", "path": "trigger", "options": {} },
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger",
+        "options": {}
+      },
       "id": "1",
       "name": "Start Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "webhookId": "trigger-workflow"
     },
     {
-      "parameters": { "resume": "webhook", "options": {} },
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
       "id": "2",
       "name": "Wait for Approval",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [0, 500],
+      "position": [
+        0,
+        500
+      ],
       "webhookId": "wait-for-approval"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=🚀 Task Received! Generating concepts for: {{ $json.body.brief }}",
+        "additionalFields": {}
+      },
+      "id": "tel_start",
+      "name": "Telegram: Start",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "your-telegram-credentials",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=🔄 Regenerating Image...",
+        "additionalFields": {}
+      },
+      "id": "tel_regen_img",
+      "name": "Telegram: Regen Image",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "your-telegram-credentials",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=🔄 Regenerating Text...",
+        "additionalFields": {}
+      },
+      "id": "tel_regen_txt",
+      "name": "Telegram: Regen Text",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        400
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "your-telegram-credentials",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -25,10 +101,22 @@
         "value1": "={{ $json.body.action || 'first_run' }}",
         "rules": {
           "rules": [
-            { "value2": "first_run" },
-            { "value2": "regenerate_image" },
-            { "value2": "regenerate_text" },
-            { "value2": "approve_all" }
+            {
+              "operation": "equal",
+              "value2": "first_run"
+            },
+            {
+              "operation": "equal",
+              "value2": "regenerate_image"
+            },
+            {
+              "operation": "equal",
+              "value2": "regenerate_text"
+            },
+            {
+              "operation": "equal",
+              "value2": "approve_all"
+            }
           ]
         }
       },
@@ -36,75 +124,129 @@
       "name": "Switch Action",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 1.1,
-      "position": [200, 400]
+      "position": [
+        400,
+        300
+      ]
     },
-    
-    
     {
-      "parameters": { "modelName": "models/gemini-3.1-flash-lite", "options": {} },
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
       "id": "5",
       "name": "Google Gemini",
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
-      "position": [600, -200],
-      "credentials": { "googlePalmApi": { "id": "your-gemini-credentials", "name": "Google Gemini(PaLM) Api account" } }
+      "position": [
+        700,
+        -200
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "your-gemini-credentials",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
     },
     {
-      "parameters": { "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"image_prompt\": { \"type\": \"string\" }\n  },\n  \"required\": [\"image_prompt\"]\n}" },
+      "parameters": {
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"image_prompt\": { \"type\": \"string\" }\n  },\n  \"required\": [\"image_prompt\"]\n}"
+      },
       "id": "6",
       "name": "Image Parser",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
-      "position": [650, -50]
+      "position": [
+        750,
+        -50
+      ]
     },
     {
-      "parameters": { "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"caption\": { \"type\": \"string\" },\n    \"hashtags\": { \"type\": \"string\" }\n  },\n  \"required\": [\"caption\", \"hashtags\"]\n}" },
+      "parameters": {
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"caption\": { \"type\": \"string\" },\n    \"hashtags\": { \"type\": \"string\" }\n  },\n  \"required\": [\"caption\", \"hashtags\"]\n}"
+      },
       "id": "9",
       "name": "Text Parser",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
-      "position": [1050, -50]
+      "position": [
+        1050,
+        -50
+      ]
     },
-
-    
     {
       "parameters": {
         "text": "={{ $('Start Webhook').item.json.body.brief }}",
         "hasOutputParser": true,
-        "options": { "systemMessage": "Create a highly detailed image generation prompt for Stable Diffusion/Flux based on the user's brief. The prompt must be vivid and descriptive." }
+        "options": {
+          "systemMessage": "Create a highly detailed image generation prompt for Stable Diffusion/Flux based on the user's brief. The prompt must be vivid and descriptive."
+        }
       },
       "id": "4",
       "name": "First Run - Image Prompt",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
-      "position": [500, 100]
+      "position": [
+        700,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
-        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendBody": true,
-        "bodyParameters": { "parameters": [ { "name": "inputs", "value": "={{ $json.image_prompt }}" } ] },
-        "options": { "response": { "response": { "responseFormat": "file", "outputPropertyName": "image" } } }
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "inputs",
+              "value": "={{ $json.image_prompt }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "image"
+            }
+          }
+        }
       },
       "id": "7",
       "name": "First Run - HF Gen",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [700, 100],
-      "credentials": { "httpHeaderAuth": { "id": "your-hf-credentials", "name": "Header Auth account" } }
+      "position": [
+        900,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "your-hf-credentials",
+          "name": "Header Auth account"
+        }
+      }
     },
     {
       "parameters": {
         "text": "={{ $('Start Webhook').item.json.body.brief }}",
         "hasOutputParser": true,
-        "options": { "systemMessage": "You are an expert social media manager. Based on the brief, create an engaging caption and a list of hashtags." }
+        "options": {
+          "systemMessage": "You are an expert social media manager. Based on the brief, create an engaging caption and a list of hashtags."
+        }
       },
       "id": "8",
       "name": "First Run - Text",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
-      "position": [900, 100]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
@@ -113,12 +255,30 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "brief", "value": "={{ $('Start Webhook').item.json.body.brief }}" },
-            { "name": "caption", "value": "={{ $json.caption }}" },
-            { "name": "hashtags", "value": "={{ $json.hashtags }}" },
-            { "name": "image_prompt", "value": "={{ $('First Run - Image Prompt').item.json.image_prompt }}" },
-            { "name": "image_data", "value": "=data:image/jpeg;base64,{{ $('First Run - HF Gen').item.binary.image.data }}" },
-            { "name": "resumeUrl", "value": "={{ $execution.resumeUrl }}" }
+            {
+              "name": "brief",
+              "value": "={{ $('Start Webhook').item.json.body.brief }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.caption }}"
+            },
+            {
+              "name": "hashtags",
+              "value": "={{ $json.hashtags }}"
+            },
+            {
+              "name": "image_prompt",
+              "value": "={{ $('First Run - Image Prompt').item.json.image_prompt }}"
+            },
+            {
+              "name": "image_data",
+              "value": "=data:image/jpeg;base64,{{ $('First Run - HF Gen').item.binary.image.data }}"
+            },
+            {
+              "name": "resumeUrl",
+              "value": "={{ $execution.resumeUrl }}"
+            }
           ]
         },
         "options": {}
@@ -127,36 +287,66 @@
       "name": "Send Draft (First Run)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1200, 100]
+      "position": [
+        1300,
+        0
+      ]
     },
-
-
     {
       "parameters": {
         "text": "={{ $('Wait for Approval').item.json.body.brief }}",
         "hasOutputParser": true,
-        "options": { "systemMessage": "Create a highly detailed image generation prompt for Stable Diffusion/Flux based on the user's brief. Make it different from before to explore new concepts." }
+        "options": {
+          "systemMessage": "Create a highly detailed image generation prompt for Stable Diffusion/Flux based on the user's brief. Make it different from before to explore new concepts."
+        }
       },
       "id": "20",
       "name": "Regen Image - Prompt",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
-      "position": [500, 300]
+      "position": [
+        700,
+        200
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
-        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendBody": true,
-        "bodyParameters": { "parameters": [ { "name": "inputs", "value": "={{ $json.image_prompt }}" } ] },
-        "options": { "response": { "response": { "responseFormat": "file", "outputPropertyName": "image" } } }
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "inputs",
+              "value": "={{ $json.image_prompt }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "image"
+            }
+          }
+        }
       },
       "id": "21",
       "name": "Regen Image - HF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [700, 300],
-      "credentials": { "httpHeaderAuth": { "id": "your-hf-credentials", "name": "Header Auth account" } }
+      "position": [
+        900,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "your-hf-credentials",
+          "name": "Header Auth account"
+        }
+      }
     },
     {
       "parameters": {
@@ -165,10 +355,22 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "id", "value": "={{ $('Wait for Approval').item.json.body.id }}" },
-            { "name": "image_prompt", "value": "={{ $('Regen Image - Prompt').item.json.image_prompt }}" },
-            { "name": "image_data", "value": "=data:image/jpeg;base64,{{ $binary.image.data }}" },
-            { "name": "resumeUrl", "value": "={{ $execution.resumeUrl }}" }
+            {
+              "name": "id",
+              "value": "={{ $('Wait for Approval').item.json.body.id }}"
+            },
+            {
+              "name": "image_prompt",
+              "value": "={{ $('Regen Image - Prompt').item.json.image_prompt }}"
+            },
+            {
+              "name": "image_data",
+              "value": "=data:image/jpeg;base64,{{ $binary.image.data }}"
+            },
+            {
+              "name": "resumeUrl",
+              "value": "={{ $execution.resumeUrl }}"
+            }
           ]
         },
         "options": {}
@@ -177,21 +379,27 @@
       "name": "Send Draft (Regen Image)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [900, 300]
+      "position": [
+        1100,
+        200
+      ]
     },
-
-
     {
       "parameters": {
         "text": "={{ $('Wait for Approval').item.json.body.brief }}",
         "hasOutputParser": true,
-        "options": { "systemMessage": "You are an expert social media manager. Based on the brief, create an engaging caption and a list of hashtags. Write it differently this time." }
+        "options": {
+          "systemMessage": "You are an expert social media manager. Based on the brief, create an engaging caption and a list of hashtags. Write it differently this time."
+        }
       },
       "id": "30",
       "name": "Regen Text - AI",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
-      "position": [500, 500]
+      "position": [
+        700,
+        400
+      ]
     },
     {
       "parameters": {
@@ -200,10 +408,22 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "id", "value": "={{ $('Wait for Approval').item.json.body.id }}" },
-            { "name": "caption", "value": "={{ $json.caption }}" },
-            { "name": "hashtags", "value": "={{ $json.hashtags }}" },
-            { "name": "resumeUrl", "value": "={{ $execution.resumeUrl }}" }
+            {
+              "name": "id",
+              "value": "={{ $('Wait for Approval').item.json.body.id }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.caption }}"
+            },
+            {
+              "name": "hashtags",
+              "value": "={{ $json.hashtags }}"
+            },
+            {
+              "name": "resumeUrl",
+              "value": "={{ $execution.resumeUrl }}"
+            }
           ]
         },
         "options": {}
@@ -212,10 +432,11 @@
       "name": "Send Draft (Regen Text)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [800, 500]
+      "position": [
+        1100,
+        400
+      ]
     },
-
-    
     {
       "parameters": {
         "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
@@ -226,57 +447,371 @@
       "name": "Telegram: Approved",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.1,
-      "position": [500, 700],
-      "credentials": { "telegramApi": { "id": "your-telegram-credentials", "name": "Telegram account" } }
+      "position": [
+        700,
+        600
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "your-telegram-credentials",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "create",
+        "owner": "SameerKr-26",
+        "repository": "Content-Generation",
+        "filePath": "=images/img_{{ $now.toFormat('yyyyMMddHHmmss') }}.png",
+        "fileContent": "={{ $('Wait for Approval').item.json.body.image_data.split(',')[1] }}",
+        "commitMessage": "Add generated image"
+      },
+      "id": "gh_img",
+      "name": "GitHub: Push Image",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        900,
+        500
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "your-github-credentials",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "create",
+        "owner": "SameerKr-26",
+        "repository": "Content-Generation",
+        "filePath": "=captions/cap_{{ $now.toFormat('yyyyMMddHHmmss') }}.txt",
+        "fileContent": "={{ $('Wait for Approval').item.json.body.caption }}\n\n{{ $('Wait for Approval').item.json.body.hashtags }}",
+        "commitMessage": "Add generated caption text"
+      },
+      "id": "gh_txt",
+      "name": "GitHub: Push Caption",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        900,
+        700
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "your-github-credentials",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=🎉 Content finalized and pushed to GitHub!\n\nCaption:\n{{ $('Wait for Approval').item.json.body.caption }}",
+        "additionalFields": {}
+      },
+      "id": "14",
+      "name": "Telegram: Final Delivery",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        600
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "your-telegram-credentials",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
   "connections": {
-    "Start Webhook": { "main": [ [ { "node": "Switch Action", "type": "main", "index": 0 } ] ] },
-    "Wait for Approval": { "main": [ [ { "node": "Switch Action", "type": "main", "index": 0 } ] ] },
-    "Switch Action": {
+    "Start Webhook": {
       "main": [
-        [ { "node": "First Run - Image Prompt", "type": "main", "index": 0 } ],
-        [ { "node": "Regen Image - Prompt", "type": "main", "index": 0 } ],
-        [ { "node": "Regen Text - AI", "type": "main", "index": 0 } ],
-        [ { "node": "Telegram: Approved", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "Telegram: Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-
-    "First Run - Image Prompt": { "main": [ [ { "node": "First Run - HF Gen", "type": "main", "index": 0 } ] ] },
-    "First Run - HF Gen": { "main": [ [ { "node": "First Run - Text", "type": "main", "index": 0 } ] ] },
-    "First Run - Text": { "main": [ [ { "node": "Send Draft (First Run)", "type": "main", "index": 0 } ] ] },
-    "Send Draft (First Run)": { "main": [ [ { "node": "Wait for Approval", "type": "main", "index": 0 } ] ] },
-
-    "Regen Image - Prompt": { "main": [ [ { "node": "Regen Image - HF", "type": "main", "index": 0 } ] ] },
-    "Regen Image - HF": { "main": [ [ { "node": "Send Draft (Regen Image)", "type": "main", "index": 0 } ] ] },
-    "Send Draft (Regen Image)": { "main": [ [ { "node": "Wait for Approval", "type": "main", "index": 0 } ] ] },
-
-    "Regen Text - AI": { "main": [ [ { "node": "Send Draft (Regen Text)", "type": "main", "index": 0 } ] ] },
-    "Send Draft (Regen Text)": { "main": [ [ { "node": "Wait for Approval", "type": "main", "index": 0 } ] ] },
-
+    "Telegram: Start": {
+      "main": [
+        [
+          {
+            "node": "Switch Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Approval": {
+      "main": [
+        [
+          {
+            "node": "Switch Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Action": {
+      "main": [
+        [
+          {
+            "node": "First Run - Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Regen Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Regen Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Regen Image": {
+      "main": [
+        [
+          {
+            "node": "Regen Image - Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Regen Text": {
+      "main": [
+        [
+          {
+            "node": "Regen Text - AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First Run - Image Prompt": {
+      "main": [
+        [
+          {
+            "node": "First Run - HF Gen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First Run - HF Gen": {
+      "main": [
+        [
+          {
+            "node": "First Run - Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First Run - Text": {
+      "main": [
+        [
+          {
+            "node": "Send Draft (First Run)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Draft (First Run)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regen Image - Prompt": {
+      "main": [
+        [
+          {
+            "node": "Regen Image - HF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regen Image - HF": {
+      "main": [
+        [
+          {
+            "node": "Send Draft (Regen Image)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Draft (Regen Image)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regen Text - AI": {
+      "main": [
+        [
+          {
+            "node": "Send Draft (Regen Text)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Draft (Regen Text)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Approved": {
+      "main": [
+        [
+          {
+            "node": "GitHub: Push Image",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GitHub: Push Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub: Push Image": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Final Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub: Push Caption": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Final Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Google Gemini": {
       "ai_languageModel": [
         [
-          { "node": "First Run - Image Prompt", "type": "ai_languageModel", "index": 0 },
-          { "node": "First Run - Text", "type": "ai_languageModel", "index": 0 },
-          { "node": "Regen Image - Prompt", "type": "ai_languageModel", "index": 0 },
-          { "node": "Regen Text - AI", "type": "ai_languageModel", "index": 0 }
+          {
+            "node": "First Run - Image Prompt",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "First Run - Text",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Regen Image - Prompt",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Regen Text - AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
         ]
       ]
     },
     "Image Parser": {
       "ai_outputParser": [
         [
-          { "node": "First Run - Image Prompt", "type": "ai_outputParser", "index": 0 },
-          { "node": "Regen Image - Prompt", "type": "ai_outputParser", "index": 0 }
+          {
+            "node": "First Run - Image Prompt",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "Regen Image - Prompt",
+            "type": "ai_outputParser",
+            "index": 0
+          }
         ]
       ]
     },
     "Text Parser": {
       "ai_outputParser": [
         [
-          { "node": "First Run - Text", "type": "ai_outputParser", "index": 0 },
-          { "node": "Regen Text - AI", "type": "ai_outputParser", "index": 0 }
+          {
+            "node": "First Run - Text",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "Regen Text - AI",
+            "type": "ai_outputParser",
+            "index": 0
+          }
         ]
       ]
     }
