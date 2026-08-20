@@ -65,13 +65,19 @@ const workflow = {
     // Image Gen & API
     {
       parameters: {
-        method: "POST", url: "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
-        authentication: "genericCredentialType", genericAuthType: "httpHeaderAuth", sendBody: true,
-        bodyParameters: { parameters: [ { name: "inputs", value: "={{ $json.image_prompt }}" } ] },
-        options: { response: { response: { responseFormat: "file", outputPropertyName: "image" } } }
+        method: "POST", 
+        url: "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3-medium-diffusers",
+        authentication: "genericCredentialType", 
+        genericAuthType: "httpBearerAuth", 
+        sendHeaders: true,
+        headerParameters: { parameters: [ { name: "Accept", value: "image/png" } ] },
+        sendBody: true,
+        specifyBody: "json",
+        jsonBody: "={{ JSON.stringify({ inputs: $json.image_prompt }) }}",
+        options: { response: { response: { responseFormat: "file", outputPropertyName: "imageData" } } }
       },
-      id: "hf", name: "Hugging Face Image Gen", type: "n8n-nodes-base.httpRequest", typeVersion: 4.1, position: [900, 300],
-      credentials: { httpHeaderAuth: { id: "your-hf-credentials", name: "Header Auth account" } }
+      id: "hf", name: "Hugging Face Image Gen", type: "n8n-nodes-base.httpRequest", typeVersion: 4.5, position: [900, 300],
+      credentials: { httpBearerAuth: { id: "your-hf-credentials", name: "Bearer Auth account" } }
     },
     {
       parameters: {
@@ -82,7 +88,7 @@ const workflow = {
           { name: "caption", value: "={{ $('AI Agent (Unified)').item.json.caption }}" },
           { name: "hashtags", value: "={{ $('AI Agent (Unified)').item.json.hashtags }}" },
           { name: "image_prompt", value: "={{ $('AI Agent (Unified)').item.json.image_prompt }}" },
-          { name: "image_data", value: "=data:image/jpeg;base64,{{ $binary.image.data }}" },
+          { name: "image_data", value: "=data:image/png;base64,{{ $binary.imageData.data }}" },
           { name: "resumeUrl", value: "={{ $execution.resumeUrl }}" }
         ] },
         options: {}
