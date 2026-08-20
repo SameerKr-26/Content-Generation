@@ -97,7 +97,28 @@
     },
     {
       "parameters": {
-        "text": "={{ $('Start Webhook').item ? $('Start Webhook').item.json.body.brief : $('Wait for Approval').item.json.body.brief }}",
+        "keepOnlySet": false,
+        "values": {
+          "string": [
+            {
+              "name": "chatInput",
+              "value": "={{ $('Start Webhook').item ? $('Start Webhook').item.json.body.brief : $('Wait for Approval').item.json.body.brief }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set_prompt",
+      "name": "Set Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
         "hasOutputParser": true,
         "options": {
           "systemMessage": "You are an expert social media manager and prompt engineer. Create a highly detailed image generation prompt, an engaging caption, and a list of relevant hashtags based on the user's brief."
@@ -108,7 +129,7 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        600,
+        700,
         300
       ]
     },
@@ -343,6 +364,17 @@
       "main": [
         [
           {
+            "node": "Set Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Prompt": {
+      "main": [
+        [
+          {
             "node": "AI Agent (Unified)",
             "type": "main",
             "index": 0
@@ -416,7 +448,7 @@
       "main": [
         [
           {
-            "node": "AI Agent (Unified)",
+            "node": "Set Prompt",
             "type": "main",
             "index": 0
           }

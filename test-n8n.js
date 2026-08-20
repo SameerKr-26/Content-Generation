@@ -34,8 +34,23 @@ const workflow = {
     
     // AI Generation block
     {
-      parameters: { text: "={{ $('Start Webhook').item ? $('Start Webhook').item.json.body.brief : $('Wait for Approval').item.json.body.brief }}", hasOutputParser: true, options: { systemMessage: "You are an expert social media manager and prompt engineer. Create a highly detailed image generation prompt, an engaging caption, and a list of relevant hashtags based on the user's brief." } },
-      id: "ai_agent", name: "AI Agent (Unified)", type: "@n8n/n8n-nodes-langchain.agent", typeVersion: 3.1, position: [600, 300]
+      parameters: {
+        keepOnlySet: false,
+        values: {
+          string: [
+            {
+              name: "chatInput",
+              value: "={{ $('Start Webhook').item ? $('Start Webhook').item.json.body.brief : $('Wait for Approval').item.json.body.brief }}"
+            }
+          ]
+        },
+        options: {}
+      },
+      id: "set_prompt", name: "Set Prompt", type: "n8n-nodes-base.set", typeVersion: 2, position: [500, 300]
+    },
+    {
+      parameters: { hasOutputParser: true, options: { systemMessage: "You are an expert social media manager and prompt engineer. Create a highly detailed image generation prompt, an engaging caption, and a list of relevant hashtags based on the user's brief." } },
+      id: "ai_agent", name: "AI Agent (Unified)", type: "@n8n/n8n-nodes-langchain.agent", typeVersion: 3.1, position: [700, 300]
     },
     {
       parameters: { modelName: "models/gemini-3.1-flash-lite", options: {} },
@@ -99,8 +114,9 @@ const workflow = {
   ],
   connections: {
     "Start Webhook": { main: [ [ { node: "Telegram: Task Received", type: "main", index: 0 } ] ] },
-    "Telegram: Task Received": { main: [ [ { node: "AI Agent (Unified)", type: "main", index: 0 } ] ] },
+    "Telegram: Task Received": { main: [ [ { node: "Set Prompt", type: "main", index: 0 } ] ] },
     
+    "Set Prompt": { main: [ [ { node: "AI Agent (Unified)", type: "main", index: 0 } ] ] },
     "AI Agent (Unified)": { main: [ [ { node: "Hugging Face Image Gen", type: "main", index: 0 } ] ] },
     "Hugging Face Image Gen": { main: [ [ { node: "Send Draft to Dashboard", type: "main", index: 0 } ] ] },
     "Send Draft to Dashboard": { main: [ [ { node: "Wait for Approval", type: "main", index: 0 } ] ] },
@@ -114,7 +130,7 @@ const workflow = {
       ]
     },
     
-    "Telegram: Regenerating": { main: [ [ { node: "AI Agent (Unified)", type: "main", index: 0 } ] ] },
+    "Telegram: Regenerating": { main: [ [ { node: "Set Prompt", type: "main", index: 0 } ] ] },
     
     "Telegram: Approved": { main: [ [ { node: "GitHub: Push Image", type: "main", index: 0 }, { node: "GitHub: Push Caption", type: "main", index: 0 } ] ] },
     "GitHub: Push Image": { main: [ [ { node: "Telegram: Final Delivery", type: "main", index: 0 } ] ] },
